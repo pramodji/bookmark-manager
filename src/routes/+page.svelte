@@ -3,7 +3,7 @@
 		Plus, Search, Bookmark as BookmarkIcon, Trash2, Edit2, 
 		GripVertical, Settings, X, Moon, Sun, Lock, Unlock,
 		FileSpreadsheet, Download, Upload, LayoutList, List, Filter, EyeOff,
-		SortAsc, SortDesc, Database, ChevronRight, Code, Copy, CopyPlus, FileUp
+		SortAsc, SortDesc, Database, ChevronRight, Code, Copy, CopyPlus, FileUp, Star
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
 
@@ -12,7 +12,7 @@
 	// --- 1. STATE ---
 	interface Bookmark { 
 		id: string; title: string; url: string; group: string; position: number;
-		tags?: string[]; notes?: string; icon?: string; 
+		tags?: string[]; notes?: string; icon?: string; favorite?: boolean; description?: string;
 	}
 
 	interface Widget {
@@ -33,6 +33,7 @@
 
 	let searchQuery = $state("");
 	let selectedTag = $state<string | null>(null);
+	let showFavoritesOnly = $state(false);
 	let isSettingsOpen = $state(false);
 	let isEditMode = $state(false);
 	let isDarkMode = $state(false);
@@ -72,7 +73,7 @@
 	let activeBookmark = $state<Bookmark | null>(null);
 	let contextMenu = $state<{ x: number, y: number, show: boolean, target: Bookmark | null }>({ x: 0, y: 0, show: false, target: null });
 
-	let tempTitle = $state(""), tempUrl = $state(""), tempTags = $state(""), tempNotes = $state(""), tempIcon = $state("");
+	let tempTitle = $state(""), tempUrl = $state(""), tempTags = $state(""), tempNotes = $state(""), tempIcon = $state(""), tempDescription = $state("");
 
 	const themeMap: Record<string, string> = {
 		blue: "#2563eb", emerald: "#10b981", purple: "#8b5cf6", rose: "#f43f5e", amber: "#f59e0b"
@@ -319,10 +320,11 @@
     function addBookmarkToGroup(group: string) {
         const url = columnInputs[group];
         if (!url) return;
+        const fullUrl = url.startsWith('http') ? url : `https://${url}`;
         const newBookmark = { 
             id: crypto.randomUUID(), title: url.split('/')[2] || url, 
-            url: url.startsWith('http') ? url : `https://${url}`, 
-            group, position: bookmarks.length, tags: [], notes: "", icon: "" 
+            url: fullUrl, 
+            group, position: bookmarks.length, tags: [], notes: "", icon: "", description: "" 
         };
         bookmarks = [...bookmarks, newBookmark];
         columnInputs[group] = "";
@@ -513,7 +515,8 @@
 	let filteredBookmarks = $derived(bookmarks.filter(b => {
 		const matchesSearch = b.title.toLowerCase().includes(searchQuery.toLowerCase()) || b.notes?.toLowerCase().includes(searchQuery.toLowerCase());
 		const matchesTag = !selectedTag || b.tags?.includes(selectedTag);
-		return matchesSearch && matchesTag;
+		const matchesFavorite = !showFavoritesOnly || b.favorite;
+		return matchesSearch && matchesTag && matchesFavorite;
 	}));
 
     function getGroupBookmarks(groupName: string) {
@@ -530,6 +533,7 @@
 		tempTags = bookmark.tags?.join(", ") || "";
         tempNotes = bookmark.notes || "";
 		tempIcon = bookmark.icon || "";
+		tempDescription = bookmark.description || "";
 		isEditModalOpen = true;
         contextMenu.show = false;
 	}
@@ -538,7 +542,7 @@
 		if (activeBookmark) {
 			const tagArray = tempTags.split(",").map(t => t.trim()).filter(t => t !== "");
 			bookmarks = bookmarks.map(b => b.id === activeBookmark!.id ? { 
-                ...b, title: tempTitle, url: tempUrl, tags: tagArray, notes: tempNotes, icon: tempIcon 
+                ...b, title: tempTitle, url: tempUrl, tags: tagArray, notes: tempNotes, icon: tempIcon, description: tempDescription
             } : b);
 			syncData(); isEditModalOpen = false;
 		}
@@ -596,7 +600,7 @@
 	<header class="h-14 bg-white dark:bg-slate-900 border-b dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20 shadow-sm">
 		<div class="flex items-center gap-4 flex-1">
 			<div class="flex items-center gap-2 font-bold uppercase tracking-tighter text-sm" style="color: var(--brand)">
-				<BookmarkIcon size={20} fill="currentColor" fill-opacity="0.2" /> <span class="font-bold">Bookmark Manager</span>
+				<BookmarkIcon size={20} fill="currentColor" fill-opacity="0.2" />
 			</div>
             
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all
@@ -610,6 +614,9 @@
             </button>
             <button onclick={() => showTags = !showTags} class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all {showTags ? 'bg-blue-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}">
                 {#if showTags}<EyeOff size={14}/>{:else}<LayoutList size={14}/>{/if} Tags
+            </button>
+            <button onclick={() => showFavoritesOnly = !showFavoritesOnly} class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all {showFavoritesOnly ? 'bg-amber-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}">
+                <Star size={14} class="{showFavoritesOnly ? '' : 'fill-none'}" /> Favorites
             </button>
             {#if selectedBookmarks.size > 0}
                 <button onclick={() => bulkIconModal = true} class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-green-500 text-white shadow-lg">
@@ -641,7 +648,7 @@
         </div>
 
 		<div class="flex items-center gap-6 flex-1 justify-end">
-            <div class="text-3xl font-light text-slate-400 dark:text-slate-500 tabular-nums" style="font-family: 'Segoe UI', system-ui, sans-serif;">
+            <div class="text-3xl font-light text-slate-400 dark:text-slate-500 tabular-nums" style="font-family: 'Segoe UI', system-ui, sans-serif; text-shadow: 0 0 10px rgba(var(--brand-rgb), 0.3), 0 0 20px rgba(var(--brand-rgb), 0.2);">
                 {time.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
             <button onclick={() => isSettingsOpen = true} class="p-2 text-slate-400 hover:text-slate-600"><Settings size={20}/></button>
@@ -719,6 +726,9 @@
                             }}
 						>
 							<GripVertical size={14} class="text-slate-300 {isEditMode ? 'opacity-100' : 'opacity-0'} shrink-0" />
+							<button onclick={(e) => { e.stopPropagation(); bookmarks = bookmarks.map(bm => bm.id === b.id ? {...bm, favorite: !bm.favorite} : bm); syncData(); }} class="shrink-0">
+								<Star size={14} class="{b.favorite ? 'fill-amber-400 text-amber-400' : 'text-slate-300'} hover:text-amber-400 transition-colors" />
+							</button>
                             <div class="w-4 h-4 flex items-center justify-center shrink-0">
                                 {#if b.icon && isSVG(b.icon)}
                                     <div class="w-full h-full flex items-center justify-center text-slate-400">{@html b.icon}</div>
@@ -973,6 +983,7 @@
     {#if contextMenu.show}
 		<div class="fixed z-[200] bg-white dark:bg-slate-900 shadow-2xl rounded-2xl border dark:border-slate-800 py-1.5 w-48 text-[11px]" style="top: {contextMenu.y}px; left: {contextMenu.x}px;" onclick={(e) => e.stopPropagation()}>
 			<button onclick={() => openEditModal(contextMenu.target!)} class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"><Edit2 size={14} class="text-blue-500"/> Edit Properties</button>
+			<button onclick={() => { bookmarks = bookmarks.map(b => b.id === contextMenu.target!.id ? {...b, favorite: !b.favorite} : b); syncData(); contextMenu.show = false; }} class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"><Star size={14} class="text-amber-500"/> {contextMenu.target?.favorite ? 'Unfavorite' : 'Favorite'}</button>
             <button onclick={() => duplicateBookmark(contextMenu.target!)} class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"><CopyPlus size={14} class="text-emerald-500"/> Duplicate</button>
             <button onclick={() => copyToClipboard(contextMenu.target!.url)} class="w-full text-left px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"><Copy size={14} class="text-amber-500"/> Copy URL</button>
 			<button onclick={() => { bookmarks = bookmarks.filter(b => b.id !== contextMenu.target!.id); syncData(); contextMenu.show = false; }} class="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-500 flex items-center gap-3 transition-colors"><Trash2 size={14}/> Delete</button>
@@ -1007,6 +1018,10 @@
                 <div class="space-y-1">
                     <label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Tags</label>
                     <input bind:value={tempTags} placeholder="tag1, tag2, tag3" class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none" />
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Description</label>
+                    <textarea bind:value={tempDescription} placeholder="Website description..." class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none resize-none" rows="2"></textarea>
                 </div>
                 <div class="space-y-1">
                     <label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Notes</label>
