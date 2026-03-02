@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #f8fafc;        /* Slate 50 */
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;   /* Slate 900 */
+  --text-secondary: #64748b; /* Slate 500 */
+  --accent: #2563eb;         /* Blue 600 */
+  --border-color: #e2e8f0;   /* Slate 200 */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--bg-main)] text-[var(--text-primary)] antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  /* The Glass/White Card Effect */
+  .bookmark-card {
+    @apply flex items-center justify-between p-4 mb-3 transition-all duration-200 
+           bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .bookmark-card:hover {
+    @apply border-blue-200 -translate-y-[1px];
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Sophisticated Input Styling */
+  .input-field {
+    @apply w-full px-4 py-2 bg-white border border-[var(--border-color)] rounded-lg
+           outline-none transition-all duration-200 
+           focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500;
+  }
+
+  /* Professional Buttons */
+  .btn-primary {
+    @apply flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent)] 
+           text-white font-medium rounded-lg hover:bg-blue-700 
+           active:scale-[0.98] transition-all shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply flex items-center justify-center gap-2 px-4 py-2 bg-white 
+           text-[var(--text-primary)] border border-[var(--border-color)] 
+           font-medium rounded-lg hover:bg-slate-50 
+           active:scale-[0.98] transition-all shadow-sm;
+  }
+
+  /* Custom Scrollbar for the Sidebar/List */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full hover:bg-slate-300;
+  }
+}
+
+/* Animation for list entry */
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
