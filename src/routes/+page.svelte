@@ -66,6 +66,7 @@
 	let taskPriority = $state("none");
 	let taskDueDate = $state("");
 	let editTaskId = $state<string | null>(null);
+	let feedCache = $state<Record<string, any>>({});
 
 	let isEditModalOpen = $state(false);
 	let activeBookmark = $state<Bookmark | null>(null);
@@ -83,6 +84,7 @@
 		'calendar': '<iframe src="https://calendar.google.com/calendar/embed" style="width:100%;height:400px;border:none;"></iframe>',
 		'notes': '<textarea placeholder="Your notes here..." style="width:100%;height:200px;padding:12px;border:1px solid #e2e8f0;border-radius:12px;outline:none;resize:vertical;"></textarea>',
 		'tasks': '[]',
+		'rss': '',
 		'embed': '<div style="padding:12px;text-align:center;color:#94a3b8;">Paste your embed code in settings</div>'
 	};
 
@@ -574,6 +576,19 @@
 		}
 		isTaskModalOpen = false;
 	}
+
+	async function fetchRSSFeed(url: string) {
+		if (feedCache[url]) return feedCache[url];
+		try {
+			const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+			const data = await res.json();
+			if (data.status === 'ok') {
+				feedCache[url] = data;
+				return data;
+			}
+		} catch (e) { console.error('RSS fetch error:', e); }
+		return null;
+	}
 </script>
 
 <div class="h-screen w-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors font-light" style="--brand: {themeMap[accentColor]}">
@@ -626,7 +641,7 @@
         </div>
 
 		<div class="flex items-center gap-6 flex-1 justify-end">
-            <div class="text-xl font-mono font-medium text-slate-700 dark:text-slate-200 tabular-nums uppercase">
+            <div class="text-3xl font-light text-slate-400 dark:text-slate-500 tabular-nums" style="font-family: 'Segoe UI', system-ui, sans-serif;">
                 {time.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
             <button onclick={() => isSettingsOpen = true} class="p-2 text-slate-400 hover:text-slate-600"><Settings size={20}/></button>
@@ -819,6 +834,23 @@
 									{/each}
 								</div>
 							</div>
+						{:else if widget.type === 'rss'}
+							{#await fetchRSSFeed(widget.content)}
+								<div class="text-center text-slate-400 text-sm py-4">Loading feed...</div>
+							{:then feed}
+								{#if feed && feed.items}
+									<div class="space-y-2 max-h-[400px] overflow-y-auto">
+										{#each feed.items.slice(0, 10) as item}
+											<a href={item.link} target="_blank" class="block p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+												<div class="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2">{item.title}</div>
+												<div class="text-[10px] text-slate-400 mt-1">{new Date(item.pubDate).toLocaleDateString()}</div>
+											</a>
+										{/each}
+									</div>
+								{:else}
+									<div class="text-center text-red-400 text-sm py-4">Failed to load feed</div>
+								{/if}
+							{/await}
 						{:else if widget.type === 'embed'}
 							<!-- Rendered by renderWidget function -->
 						{:else}
@@ -1028,6 +1060,7 @@
 						<option value="calendar">Calendar</option>
 						<option value="notes">Notes</option>
 						<option value="tasks">Tasks</option>
+						<option value="rss">RSS Feed</option>
 						<option value="embed">Custom Embed</option>
 					</select>
                 </div>
@@ -1040,10 +1073,10 @@
                         {/each}
 					</select>
                 </div>
-				{#if widgetType === 'embed' || editWidgetId}
+				{#if widgetType === 'embed' || widgetType === 'rss' || editWidgetId}
 				<div class="space-y-1">
-                    <label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Content</label>
-                    <textarea bind:value={widgetContent} placeholder="Paste iframe or embed code..." class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none resize-none" rows="4"></textarea>
+                    <label class="text-[9px] font-bold uppercase text-slate-400 ml-2">{widgetType === 'rss' ? 'RSS Feed URL' : 'Content'}</label>
+                    <textarea bind:value={widgetContent} placeholder={widgetType === 'rss' ? 'https://example.com/feed.xml' : 'Paste iframe or embed code...'} class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none resize-none" rows="4"></textarea>
                 </div>
 				{/if}
 				<button onclick={saveWidgetChanges} class="w-full py-4 rounded-2xl font-black text-white uppercase tracking-[0.2em] shadow-xl mt-4" style="background-color: var(--brand)">{editWidgetId ? 'Update' : 'Add'} Widget</button>
