@@ -1247,7 +1247,7 @@
 <style>
 	:global(body) { margin: 0; padding: 0; overflow: hidden; font-family: 'Century Gothic', sans-serif; }
     .bookmark-row { border-left: 3px solid transparent; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-    .bookmark-row:hover { border-left: 3px solid var(--brand); }
+    .bookmark-row:hover { border-left: 3px solid var(--brand); transform: scale(1.02); }
     .group-header { cursor: grab; }
     .group-header:active { cursor: grabbing; }
     ::-webkit-scrollbar { display: none; }
