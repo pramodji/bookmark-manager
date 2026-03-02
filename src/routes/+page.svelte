@@ -59,6 +59,13 @@
 	let widgetContent = $state("");
 	let widgetColumn = $state(1);
 	let editWidgetId = $state<string | null>(null);
+	let isTaskModalOpen = $state(false);
+	let taskWidgetId = $state<string | null>(null);
+	let taskText = $state("");
+	let taskDetails = $state("");
+	let taskPriority = $state("none");
+	let taskDueDate = $state("");
+	let editTaskId = $state<string | null>(null);
 
 	let isEditModalOpen = $state(false);
 	let activeBookmark = $state<Bookmark | null>(null);
@@ -534,6 +541,39 @@
 			syncData(); isEditModalOpen = false;
 		}
 	}
+
+	function openTaskModal(widgetId: string, task?: any) {
+		taskWidgetId = widgetId;
+		if (task) {
+			editTaskId = task.id;
+			taskText = task.text;
+			taskDetails = task.details || "";
+			taskPriority = task.priority || "none";
+			taskDueDate = task.dueDate || "";
+		} else {
+			editTaskId = null;
+			taskText = "";
+			taskDetails = "";
+			taskPriority = "none";
+			taskDueDate = "";
+		}
+		isTaskModalOpen = true;
+	}
+
+	function saveTaskChanges() {
+		if (!taskWidgetId || !taskText.trim()) return;
+		const widget = widgets.find(w => w.id === taskWidgetId);
+		if (!widget) return;
+		const tasks = (() => { try { return JSON.parse(widget.content || '[]'); } catch { return []; } })();
+		if (editTaskId) {
+			const newTasks = tasks.map(t => t.id === editTaskId ? {...t, text: taskText, details: taskDetails, priority: taskPriority, dueDate: taskDueDate} : t);
+			updateWidgetContent(taskWidgetId, JSON.stringify(newTasks));
+		} else {
+			const newTasks = [...tasks, {id: crypto.randomUUID(), text: taskText, details: taskDetails, priority: taskPriority, dueDate: taskDueDate, done: false}];
+			updateWidgetContent(taskWidgetId, JSON.stringify(newTasks));
+		}
+		isTaskModalOpen = false;
+	}
 </script>
 
 <div class="h-screen w-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors font-light" style="--brand: {themeMap[accentColor]}">
@@ -747,31 +787,29 @@
 						{:else if widget.type === 'tasks'}
 							{@const tasks = (() => { try { return JSON.parse(widget.content || '[]'); } catch { return []; } })()}
 							<div class="space-y-2">
-								<div class="flex gap-2">
-									<input type="text" placeholder="Add task..." class="flex-1 p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none bg-transparent" onkeydown={(e) => {
-										if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-											const newTasks = [...tasks, {id: crypto.randomUUID(), text: e.currentTarget.value.trim(), done: false}];
-											updateWidgetContent(widget.id, JSON.stringify(newTasks));
-											e.currentTarget.value = '';
-										}
-									}} />
-								</div>
+								<button onclick={() => openTaskModal(widget.id)} class="p-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1 text-[11px] font-medium">
+									<Plus size={14} /> Add
+								</button>
 								<div class="space-y-1 max-h-[300px] overflow-y-auto">
 									{#each tasks as task}
-										<div class="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg group">
+										{@const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.done}
+										<div class="flex items-start gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg group border-l-2 {task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-amber-500' : task.priority === 'low' ? 'border-blue-500' : 'border-transparent'}" onclick={() => isEditMode && openTaskModal(widget.id, task)}>
 											<input type="checkbox" checked={task.done} onchange={(e) => {
+												e.stopPropagation();
 												const newTasks = tasks.map(t => t.id === task.id ? {...t, done: e.currentTarget.checked} : t);
 												updateWidgetContent(widget.id, JSON.stringify(newTasks));
-											}} class="w-4 h-4 cursor-pointer" />
-											{#if isEditMode}
-												<input type="text" value={task.text} oninput={(e) => {
-													const newTasks = tasks.map(t => t.id === task.id ? {...t, text: e.currentTarget.value} : t);
-													updateWidgetContent(widget.id, JSON.stringify(newTasks));
-												}} class="flex-1 text-sm bg-transparent border-none outline-none {task.done ? 'line-through text-slate-400' : ''}" />
-											{:else}
-												<span class="flex-1 text-sm {task.done ? 'line-through text-slate-400' : ''}">{task.text}</span>
-											{/if}
-											<button onclick={() => {
+											}} class="w-4 h-4 mt-0.5 cursor-pointer" />
+											<div class="flex-1 flex flex-col gap-1 cursor-pointer">
+												<span class="text-sm {task.done ? 'line-through text-slate-400' : ''}">{task.text}</span>
+												{#if task.details}
+													<span class="text-[11px] text-slate-500">{task.details}</span>
+												{/if}
+												{#if task.dueDate}
+													<span class="text-[10px] {isOverdue ? 'text-red-500 font-semibold' : 'text-slate-400'}">{new Date(task.dueDate).toLocaleDateString()}</span>
+												{/if}
+											</div>
+											<button onclick={(e) => {
+												e.stopPropagation();
 												const newTasks = tasks.filter(t => t.id !== task.id);
 												updateWidgetContent(widget.id, JSON.stringify(newTasks));
 											}} class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
@@ -1009,6 +1047,39 @@
                 </div>
 				{/if}
 				<button onclick={saveWidgetChanges} class="w-full py-4 rounded-2xl font-black text-white uppercase tracking-[0.2em] shadow-xl mt-4" style="background-color: var(--brand)">{editWidgetId ? 'Update' : 'Add'} Widget</button>
+			</div>
+		</div>
+	{/if}
+
+	{#if isTaskModalOpen}
+		<div class="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+			<div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-10 space-y-4 shadow-2xl">
+				<div class="flex justify-between border-b dark:border-slate-800 pb-4">
+					<h3 class="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">{editTaskId ? 'Edit' : 'Add'} Task</h3>
+					<button onclick={() => isTaskModalOpen = false}><X size={20}/></button>
+				</div>
+				<div class="space-y-1">
+					<label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Task</label>
+					<input bind:value={taskText} placeholder="Task name..." class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none" />
+				</div>
+				<div class="space-y-1">
+					<label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Details</label>
+					<textarea bind:value={taskDetails} placeholder="Add details..." class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none resize-none" rows="3"></textarea>
+				</div>
+				<div class="space-y-1">
+					<label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Priority</label>
+					<select bind:value={taskPriority} class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none">
+						<option value="none">None</option>
+						<option value="low">Low</option>
+						<option value="medium">Medium</option>
+						<option value="high">High</option>
+					</select>
+				</div>
+				<div class="space-y-1">
+					<label class="text-[9px] font-bold uppercase text-slate-400 ml-2">Due Date</label>
+					<input type="date" bind:value={taskDueDate} class="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-[13px] outline-none" />
+				</div>
+				<button onclick={saveTaskChanges} class="w-full py-4 rounded-2xl font-black text-white uppercase tracking-[0.2em] shadow-xl mt-4" style="background-color: var(--brand)">{editTaskId ? 'Update' : 'Add'} Task</button>
 			</div>
 		</div>
 	{/if}
