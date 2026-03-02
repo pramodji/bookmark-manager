@@ -30,6 +30,7 @@
     let groupWidgets = $state<Record<string, string>>({});
     let groupSortDirections = $state<Record<string, 'none' | 'asc' | 'desc'>>({});
     let groupColumns = $state<Record<string, number>>({});
+    let groupColors = $state<Record<string, string>>({});
 
 	let searchQuery = $state("");
 	let selectedTag = $state<string | null>(null);
@@ -39,7 +40,10 @@
 	let isDarkMode = $state(false);
     let showTags = $state(false); 
     let compactMode = $state(true);
-	let accentColor = $state("blue"); 
+	let accentColor = $state("blue");
+	let bgColor = $state("slate");
+	let cardColor = $state("white");
+	let hoverColor = $state("blue"); 
 	let columnInputs = $state<Record<string, string>>({}); 
 	let draggedId = $state<null | string>(null);
     let draggedGroup = $state<null | string>(null);
@@ -76,7 +80,36 @@
 	let tempTitle = $state(""), tempUrl = $state(""), tempTags = $state(""), tempNotes = $state(""), tempIcon = $state(""), tempDescription = $state("");
 
 	const themeMap: Record<string, string> = {
-		blue: "#2563eb", emerald: "#10b981", purple: "#8b5cf6", rose: "#f43f5e", amber: "#f59e0b"
+		blue: "#2563eb", emerald: "#10b981", purple: "#8b5cf6", rose: "#f43f5e", amber: "#f59e0b",
+		red: "#ef4444", orange: "#f97316", yellow: "#eab308", lime: "#84cc16", cyan: "#06b6d4"
+	};
+
+	const bgColorMap: Record<string, {light: string, dark: string}> = {
+		slate: {light: "bg-slate-50", dark: "dark:bg-slate-950"},
+		gray: {light: "bg-gray-50", dark: "dark:bg-gray-950"},
+		neutral: {light: "bg-neutral-50", dark: "dark:bg-neutral-950"},
+		stone: {light: "bg-stone-50", dark: "dark:bg-stone-950"},
+		zinc: {light: "bg-zinc-50", dark: "dark:bg-zinc-950"}
+	};
+
+	const cardColorMap: Record<string, {light: string, dark: string}> = {
+		white: {light: "bg-white", dark: "dark:bg-slate-900"},
+		slate: {light: "bg-slate-100", dark: "dark:bg-slate-800"},
+		gray: {light: "bg-gray-100", dark: "dark:bg-gray-800"},
+		neutral: {light: "bg-neutral-100", dark: "dark:bg-neutral-800"}
+	};
+
+	const hoverColorMap: Record<string, {light: string, dark: string}> = {
+		blue: {light: "hover:ring-blue-300", dark: "dark:hover:ring-blue-700"},
+		emerald: {light: "hover:ring-emerald-300", dark: "dark:hover:ring-emerald-700"},
+		purple: {light: "hover:ring-purple-300", dark: "dark:hover:ring-purple-700"},
+		rose: {light: "hover:ring-rose-300", dark: "dark:hover:ring-rose-700"},
+		amber: {light: "hover:ring-amber-300", dark: "dark:hover:ring-amber-700"},
+		red: {light: "hover:ring-red-300", dark: "dark:hover:ring-red-700"},
+		orange: {light: "hover:ring-orange-300", dark: "dark:hover:ring-orange-700"},
+		yellow: {light: "hover:ring-yellow-300", dark: "dark:hover:ring-yellow-700"},
+		lime: {light: "hover:ring-lime-300", dark: "dark:hover:ring-lime-700"},
+		cyan: {light: "hover:ring-cyan-300", dark: "dark:hover:ring-cyan-700"}
 	};
 
 	const widgetTemplates: Record<string, string> = {
@@ -96,9 +129,18 @@
         const timer = setInterval(() => { time = new Date(); }, 1000);
 		isDarkMode = localStorage.getItem('mk_dark') === 'true';
 		accentColor = localStorage.getItem('mk_accent') || "blue";
+		bgColor = localStorage.getItem('mk_bg') || "slate";
+		cardColor = localStorage.getItem('mk_card') || "white";
+		hoverColor = localStorage.getItem('mk_hover') || "blue";
 
 		await loadData();
         window.addEventListener('click', () => { contextMenu.show = false; });
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                document.querySelector('input[placeholder="Search bookmarks..."]')?.focus();
+            }
+        });
         return () => { clearInterval(timer); };
 	});
 
@@ -121,6 +163,7 @@
             collapsedGroups = data.collapsed || {};
             groupWidgets = data.widgets || {};
             groupColumns = data.columns || {};
+            groupColors = data.groupColors || {};
 			widgets = data.standaloneWidgets || [];
             syncStatus = "synced";
             console.log('Loaded from API:', { groups, bookmarks, widgets });
@@ -131,6 +174,7 @@
             collapsedGroups = JSON.parse(localStorage.getItem('mk_collapsed') || '{}');
             groupWidgets = JSON.parse(localStorage.getItem('mk_widgets') || '{}');
             groupColumns = JSON.parse(localStorage.getItem('mk_columns') || '{}');
+            groupColors = JSON.parse(localStorage.getItem('mk_groupColors') || '{}');
 			widgets = JSON.parse(localStorage.getItem('mk_standaloneWidgets') || '[]');
             bookmarks = JSON.parse(localStorage.getItem('mk_bookmarks') || '[]').sort((a: any, b: any) => a.position - b.position);
             console.log('Loaded from localStorage:', { groups, bookmarks, widgets });
@@ -144,13 +188,17 @@
         localStorage.setItem('mk_collapsed', JSON.stringify(collapsedGroups));
         localStorage.setItem('mk_widgets', JSON.stringify(groupWidgets));
         localStorage.setItem('mk_columns', JSON.stringify(groupColumns));
+        localStorage.setItem('mk_groupColors', JSON.stringify(groupColors));
 		localStorage.setItem('mk_standaloneWidgets', JSON.stringify(widgets));
         localStorage.setItem('mk_accent', accentColor);
+        localStorage.setItem('mk_bg', bgColor);
+        localStorage.setItem('mk_card', cardColor);
+        localStorage.setItem('mk_hover', hoverColor);
         try {
             const res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bookmarks, groups, sorts: groupSortDirections, collapsed: collapsedGroups, widgets: groupWidgets, columns: groupColumns, appTitle, standaloneWidgets: widgets })
+                body: JSON.stringify({ bookmarks, groups, sorts: groupSortDirections, collapsed: collapsedGroups, widgets: groupWidgets, columns: groupColumns, appTitle, standaloneWidgets: widgets, groupColors })
             });
             syncStatus = res.ok ? "synced" : "offline";
         } catch (e) { syncStatus = "offline"; }
@@ -352,6 +400,10 @@
             groupColumns[newName] = groupColumns[oldName];
             delete groupColumns[oldName];
         }
+        if (groupColors[oldName]) {
+            groupColors[newName] = groupColors[oldName];
+            delete groupColors[oldName];
+        }
         syncData();
     }
 
@@ -364,6 +416,7 @@
         delete collapsedGroups[groupName];
         delete groupWidgets[groupName];
         delete groupColumns[groupName];
+        delete groupColors[groupName];
         syncData();
     }
 
@@ -595,7 +648,7 @@
 	}
 </script>
 
-<div class="h-screen w-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors font-light" style="--brand: {themeMap[accentColor]}">
+<div class="h-screen w-screen flex flex-col {bgColorMap[bgColor].light} {bgColorMap[bgColor].dark} text-slate-800 dark:text-slate-100 transition-colors font-light" style="--brand: {themeMap[accentColor]}">
 	
 	<header class="h-14 bg-white dark:bg-slate-900 border-b dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20 shadow-sm">
 		<div class="flex items-center gap-4 flex-1">
@@ -630,7 +683,9 @@
                 <div class="relative flex-1">
                     <Search class="absolute left-4 top-3 text-slate-400" size={16} />
                     <input bind:value={searchQuery} placeholder="Search bookmarks..." class="w-full pl-12 pr-10 py-3 text-sm bg-slate-100 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20" />
-					{#if searchQuery}
+					{#if !searchQuery}
+						<span class="absolute right-3 top-3 text-[10px] text-slate-400 font-mono">Ctrl+B</span>
+					{:else}
 						<button onclick={() => searchQuery = ""} class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition-colors">
 							<X size={16} />
 						</button>
@@ -675,8 +730,9 @@
                     <div class="flex items-center gap-3">
                         <button onclick={() => toggleCollapse(group)} class="flex items-center gap-2 group/title">
                             <ChevronRight size={12} class="text-slate-400 transition-transform duration-200 {collapsedGroups[group] ? '' : 'rotate-90'}" />
-                            <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover/title:text-slate-600 transition-colors">{group}</h2>
+                            <h2 class="text-[11px] font-black uppercase tracking-[0.2em] group-hover/title:text-slate-600 transition-colors" style="color: {groupColors[group] ? themeMap[groupColors[group]] : '#94a3b8'}">{group}</h2>
                         </button>
+                        <span class="text-[10px] font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{getGroupBookmarks(group).length}</span>
                         
                         <button onclick={() => toggleSort(group)} class="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg">
                             {#if groupSortDirections[group] === 'asc'} <SortAsc size={14} class="text-blue-500" />
@@ -695,7 +751,7 @@
                     </div>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-lg ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden divide-y dark:divide-slate-800 transition-all duration-300 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700 {collapsedGroups[group] ? 'max-h-0 opacity-0 invisible' : 'max-h-[2000px] opacity-100 visible'}">
+				<div class="{cardColorMap[cardColor].light} {cardColorMap[cardColor].dark} rounded-[1.5rem] shadow-lg ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden divide-y dark:divide-slate-800 transition-all duration-300 hover:ring-2 {hoverColorMap[hoverColor].light} {hoverColorMap[hoverColor].dark} {collapsedGroups[group] ? 'max-h-0 opacity-0 invisible' : 'max-h-[2000px] opacity-100 visible'}">
                     {#if isEditMode}
 						<div class="p-3 bg-slate-50 dark:bg-slate-800/50 flex gap-2">
 							<input bind:value={columnInputs[group]} list="url-suggestions" placeholder="Quick add URL..." class="flex-1 text-sm p-3 bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 outline-none" onkeydown={(e) => e.key === 'Enter' && addBookmarkToGroup(group)} />
@@ -805,7 +861,7 @@
 						</div>
 					{/if}
 				</div>
-				<div class="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-lg ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden transition-all duration-300 {widget.collapsed ? 'max-h-0 opacity-0 invisible' : 'max-h-[2000px] opacity-100 visible'}">
+				<div class="{cardColorMap[cardColor].light} {cardColorMap[cardColor].dark} rounded-[1.5rem] shadow-lg ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden transition-all duration-300 {widget.collapsed ? 'max-h-0 opacity-0 invisible' : 'max-h-[2000px] opacity-100 visible'}">
 					<div class="p-4" id="widget-{widget.id}">
 						{#if widget.type === 'notes'}
 							<textarea value={widget.content.match(/placeholder="([^"]*)"/)?.[0] ? '' : widget.content} oninput={(e) => updateWidgetContent(widget.id, e.currentTarget.value)} placeholder="Your notes here..." class="w-full h-[200px] p-3 border border-slate-200 dark:border-slate-700 rounded-xl outline-none resize-vertical bg-transparent"></textarea>
@@ -915,6 +971,12 @@
                                     <button onclick={() => { renameGroup(group, tempGroupName); editingGroupName = null; }} class="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"><Edit2 size={14}/></button>
                                 {:else}
                                     <span class="flex-1 text-xs px-2">{group}</span>
+                                    <select bind:value={groupColors[group]} onchange={() => syncData()} class="text-[10px] px-1 py-0.5 bg-white dark:bg-slate-900 rounded border dark:border-slate-700">
+                                        <option value="">Default</option>
+                                        {#each Object.keys(themeMap) as color}
+                                            <option value={color}>{color.charAt(0).toUpperCase() + color.slice(1)}</option>
+                                        {/each}
+                                    </select>
                                     <select bind:value={groupColumns[group]} onchange={() => syncData()} class="text-[10px] px-1 py-0.5 bg-white dark:bg-slate-900 rounded border dark:border-slate-700">
                                         {#each Array.from({length: 5}, (_, i) => i + 1) as col}
                                             <option value={col}>Col {col}</option>
@@ -932,6 +994,55 @@
                                     <button onclick={() => addGroupAfter = null} class="p-1 text-slate-400 hover:text-red-500 rounded"><X size={14}/></button>
                                 </div>
                             {/if}
+                        {/each}
+                    </div>
+                </div>
+
+                <div class="space-y-4 pt-4 border-t dark:border-slate-800">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 block">Accent Color</label>
+                    <div class="flex gap-2 flex-wrap">
+                        {#each Object.keys(themeMap) as color}
+                            <button 
+                                onclick={() => { accentColor = color; syncData(); }} 
+                                class="w-10 h-10 rounded-full border-2 {accentColor === color ? 'border-white dark:border-slate-900 ring-2 ring-offset-2 ring-slate-400' : 'border-transparent'}" 
+                                style="background-color: {themeMap[color]};"
+                                title={color.charAt(0).toUpperCase() + color.slice(1)}
+                            ></button>
+                        {/each}
+                    </div>
+                </div>
+
+                <div class="space-y-4 pt-4 border-t dark:border-slate-800">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 block">Background</label>
+                    <select bind:value={bgColor} onchange={() => syncData()} class="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-xl text-xs outline-none">
+                        <option value="slate">Slate</option>
+                        <option value="gray">Gray</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="stone">Stone</option>
+                        <option value="zinc">Zinc</option>
+                    </select>
+                </div>
+
+                <div class="space-y-4 pt-4 border-t dark:border-slate-800">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 block">Card Style</label>
+                    <select bind:value={cardColor} onchange={() => syncData()} class="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-xl text-xs outline-none">
+                        <option value="white">White</option>
+                        <option value="slate">Slate</option>
+                        <option value="gray">Gray</option>
+                        <option value="neutral">Neutral</option>
+                    </select>
+                </div>
+
+                <div class="space-y-4 pt-4 border-t dark:border-slate-800">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 block">Hover Border</label>
+                    <div class="flex gap-2 flex-wrap">
+                        {#each Object.keys(themeMap) as color}
+                            <button 
+                                onclick={() => { hoverColor = color; syncData(); }} 
+                                class="w-10 h-10 rounded-full border-2 {hoverColor === color ? 'border-white dark:border-slate-900 ring-2 ring-offset-2 ring-slate-400' : 'border-transparent'}" 
+                                style="background-color: {themeMap[color]};"
+                                title={color.charAt(0).toUpperCase() + color.slice(1)}
+                            ></button>
                         {/each}
                     </div>
                 </div>
@@ -965,7 +1076,7 @@
                             <input type="file" accept=".csv" class="hidden" onchange={(e) => e.currentTarget.files && handleCSVImport(e.currentTarget.files[0])} />
                         </label>
                         <button onclick={() => {
-                            const data = { groups, bookmarks, sorts: groupSortDirections, collapsed: collapsedGroups, widgets: groupWidgets, columns: groupColumns };
+                            const data = { groups, bookmarks, sorts: groupSortDirections, collapsed: collapsedGroups, widgets: groupWidgets, columns: groupColumns, groupColors };
                             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                             const a = document.createElement('a'); 
                             a.href = URL.createObjectURL(blob); 
